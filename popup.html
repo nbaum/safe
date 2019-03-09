@@ -1,0 +1,45 @@
+<link rel=stylesheet href="style.css">
+<horizontal>
+  <vertical>
+    <select id="entries" size=5 style="width: 15em; height: 100%">
+      <option>(New)</option>
+    </select>
+  </vertical>
+  <vertical>
+    <horizontal>
+        <input placeholder="Name" id="name" name="name">
+        <input placeholder="Safe" id="safe" name="safe">
+      </horizontal>
+    <horizontal>
+      <input placeholder="Host" id="host" name="host">
+    </horizontal>
+    <horizontal>
+      <input placeholder="Username" id="username" name="username">
+      <button placeholder="username" id="copy_username">
+        <img title="Copy to Clipboard" width="16" height="16" src="icons/copy.svg">
+      </button>
+    </horizontal>
+    <horizontal>
+      <input placeholder="Password" id="password" name="password" type="password">
+      <button id="gen_password">
+        <img title="Generate Password" width="16" height="16" src="icons/gen.svg">
+      </button>
+      <button id="copy_password">
+        <img title="Copy to Clipboard" width="16" height="16" src="icons/copy.svg">
+      </button>
+    </horizontal>
+    <horizontal>
+      <textarea placeholder="Notes" id="notes" name="notes" style="width: 100%" rows=3></textarea>
+    </horizontal>
+    <horizontal>
+      <button disabled id="inject">Fill In</button>
+      <button id="save">Save</button>
+      <!-- <button disabled id="scrape">Scrape</button> -->
+      <!-- <button disabled id="forget">Delete</button> -->
+      <button id="settings">Settings</button>
+    </horizontal>
+  </vertical>
+</horizontal>
+<script src="framework.js"></script>
+<script src="safe.js"></script>
+<script src="popup.js"></script>

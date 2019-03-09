@@ -1,0 +1,1 @@
+tsc -t ESNEXT -w *.ts

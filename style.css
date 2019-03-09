@@ -1,0 +1,39 @@
+horizontal {
+  display: flex;
+  width: 100%;
+}
+
+input {
+  flex: 1 0;
+  padding: 0;
+}
+
+button {
+  padding: 0;
+}
+
+/* .hide {
+  display: none;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: "Arial", sans-serif;
+}
+form {
+  padding: 0;
+  margin: 0;
+}
+div, p {
+  white-space: nowrap;
+  margin: 0.5ex 0.5ex 0.5ex 0;
+  display: flex;
+}
+div > *, p > * {
+  margin-left: 1ex;
+  align-content: center;
+  display: block;
+}
+textarea {
+  padding: 1ex;
+}*/
