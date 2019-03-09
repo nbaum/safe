@@ -33,13 +33,13 @@ ready(function () {
         var cipher = JSON.parse(json);
         return sjcl.decrypt(key, cipher);
     }
-    function dumpDB() {
-        var key = the("#key").value;
-        var plain = localStorage.getItem("entries");
-        var data = JSON.parse(plain);
-        var json = JSON.stringify(data, null, 2);
-        the("#data").value = json;
-    }
+    // function dumpDB () {
+    //   var key = the<HTMLInputElement>("#key").value;
+    //   var plain = localStorage.getItem("entries")
+    //   var data = JSON.parse(plain)
+    //   var json = JSON.stringify(data, null, 2)
+    //   the<HTMLTextAreaElement>("#data").value = json
+    // }
     function auth() {
         var usr = the("#username").value;
         var pak = the("#pak").value;
@@ -121,12 +121,20 @@ ready(function () {
         var data = the("#data").value;
         localStorage.setItem("entries", data);
     });
+    on("#save-key", "click", (e) => { localStorage.setItem("the-key", the("#key").value); });
+    on("#save-username", "click", (e) => { localStorage.setItem("the-username", the("#username").value); });
+    on("#save-pak", "click", (e) => { localStorage.setItem("the-pak", the("#pak").value); });
+    on("#save-gist", "click", (e) => { localStorage.setItem("the-gist", the("#gist").value); });
+    the("#key").value = localStorage.getItem("the-key");
+    the("#username").value = localStorage.getItem("the-username");
+    the("#pak").value = localStorage.getItem("the-pak");
+    the("#gist").value = localStorage.getItem("the-gist");
     on("#key", "change keyup", (e) => {
-        dumpDB();
+        // dumpDB();
     });
     on("#genpass", "click", (e) => {
         the("#key").value = genValidPassword(32, [hex]);
-        dumpDB();
+        // dumpDB()
     });
-    dumpDB();
+    // dumpDB();
 });
