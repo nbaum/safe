@@ -7,6 +7,7 @@ interface Entry {
   notes: string
   index: number
   safe: string
+  date: number
 }
 
 class Database {

@@ -23,25 +23,16 @@ ready(function () {
     return
   }
 
-  function addDates(data: string): string {
-    var rs = JSON.parse(data)
-    rs = rs.map((r:any) => {
-      if (r.date == null) {
-        r.date = new Date().getTime()
-      }
-      return r
-    });
-    return JSON.stringify(rs)
-  }
-
-  function encrypt(key: string, data: string): string {
+  function encrypt(data: string): string {
+    var key = the<HTMLInputElement>("#key").value
     var cipher = sjcl.encrypt(key, data)
     var json = JSON.stringify(cipher)
     var base64 = btoa(json).match(/.{1,76}/g).join("\n")
     return base64
   }
 
-  function decrypt(key: string, data: string): string {
+  function decrypt(data: string): string {
+    var key = the<HTMLInputElement>("#key").value
     var base64 = data.split("\n").join("")
     var json = atob(base64)
     var cipher = JSON.parse(json)
@@ -50,50 +41,90 @@ ready(function () {
 
   function dumpDB () {
     var key = the<HTMLInputElement>("#key").value;
-    var plain = addDates(localStorage.getItem("entries"))
-    if (key == "") {
-      var data = JSON.parse(plain)
-      var json = JSON.stringify(data, null, 2)
-      the<HTMLTextAreaElement>("#data").value = json
-    } else {
-      the<HTMLTextAreaElement>("#data").value = encrypt(key, plain)
-    }
+    var plain = localStorage.getItem("entries")
+    var data = JSON.parse(plain)
+    var json = JSON.stringify(data, null, 2)
+    the<HTMLTextAreaElement>("#data").value = json
   }
 
-  on("#sync", "click", (e) => {
-    var key = the<HTMLInputElement>("#key").value;
-    var gist = the<HTMLInputElement>("#gist").value;
-    fetch(`https://api.github.com/gists/${gist}`).then(function(r){
-      r.json().then(function(r){
-        console.log(r)
-        var base64 = r.files.safe.content
-        var json = atob(base64)
-        var cipher = JSON.parse(json)
-        var plain = sjcl.decrypt(key, cipher)
-      })
+  function auth(): string {
+    var usr = the<HTMLInputElement>("#username").value
+    var pak = the<HTMLInputElement>("#pak").value
+    return `Basic ${btoa(`${usr}:${pak}`)}`
+  }
+
+  function push(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      var key = the<HTMLInputElement>("#key").value
+      var gist = the<HTMLInputElement>("#gist").value
+      var data = encrypt(localStorage.getItem("entries"))
+      fetch(`https://api.github.com/gists/${gist}`, {
+        method: "PATCH",
+        headers: { "Authorization": auth() },
+        body: JSON.stringify({
+          description: "Password safe",
+          files: { safe: { content: data } }
+        })
+      }).then((r) => {
+        r.json().then((r) => {
+          if (r.message != null)
+            reject(r.message)
+          resolve("Pushed")
+        }).catch(reject)
+      }).catch(reject)
     })
+  }
+
+  function pull(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      var gist = the<HTMLInputElement>("#gist").value
+      fetch(`https://api.github.com/gists/${gist}`, {
+        headers: { "Authorization": auth() }
+      }).then(function(r){
+        r.json().then(function(r){
+          if (r.message != null)
+            reject(r.message)
+          var data = decrypt(r.files.safe.content)
+          resolve(JSON.stringify(JSON.parse(data), null, 2))
+        }).catch(reject)
+      }).catch(reject)
+    })
+  }
+
+  on("#sync", "click", async (e) => {
+    var result
+    try {
+      var theirs = JSON.parse(await pull())
+      var ours = JSON.parse(localStorage.getItem("entries"))
+      for (let key in theirs) {
+        var their = theirs[key]
+        var our = ours[key]
+        if (our.date < their.date)
+          ours[key] = their
+      }
+      result = await push()
+    } catch (r) {
+      result = r
+    }
+    alert(result)
   })
 
-  on("#push", "click", (e) => {
-    var key = the<HTMLInputElement>("#key").value
-    var gist = the<HTMLInputElement>("#gist").value
-    var data = encrypt(key, addDates(localStorage.getItem("entries")))
-    var body = {
-      description: "Password safe",
-      files: {
-        safe: {
-          content: encrypt(key, data)
-        }
-      }
+  on("#push", "click", async (e) => {
+    try {
+      var result = await push()
+      alert(result)
+    } catch (r) {
+      alert(r)
     }
-    fetch(`https://api.github.com/gists/${gist}`, {
-      method: "PATCH",
-      body: JSON.stringify(body)
-    }).then(function(r){
-      r.json().then(function(r){
-        console.log(r)
-      })
-    })
+  })
+
+  on("#pull", "click", async (e) => {
+    try {
+      the<HTMLTextAreaElement>("#data").value = await pull()
+      alert("Database pulled")
+    } catch (r) {
+      alert(r)
+    }
   })
 
   on("#save", "click", (e) => {

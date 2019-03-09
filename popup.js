@@ -51,12 +51,14 @@ ready(function () {
             username: eUsername.value,
             password: ePassword.value,
             notes: eNotes.value,
-            safe: eSafe.value
+            safe: eSafe.value,
+            date: 0
         };
     }
     function storeEntry() {
         var e = getFormEntry();
         theEntry = e;
+        e.date = new Date().getTime();
         if (e.index == null) {
             e.index = entries.length;
             entries.push(e);
@@ -92,15 +94,18 @@ ready(function () {
             notes: e.notes,
             index: null,
             safe: e.safe,
+            date: 0,
         };
     }
     function upgrade(e) {
         if (e.safe == null)
             e.safe = "Default";
+        if (e.date == null)
+            e.date = 0;
         return e;
     }
     function loadEntry(index) {
-        var e = index ? entries[index] : getFloatingEntry();
+        var e = index == null ? getFloatingEntry() : entries[index];
         e = upgrade(e);
         eName.value = e.name;
         eHost.value = e.host;
