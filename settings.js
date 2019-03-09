@@ -86,13 +86,21 @@ ready(function () {
         try {
             var theirs = JSON.parse(await pull());
             var ours = JSON.parse(localStorage.getItem("entries"));
+            if (ours == null) {
+                localStorage.setItem("entries", JSON.stringify(theirs));
+                alert("Initial database imported");
+                return;
+            }
             for (let key in theirs) {
                 var their = theirs[key];
                 var our = ours[key];
-                if (our.date < their.date)
+                if (our == null)
+                    ours[key] = their;
+                else if (our.date < their.date)
                     ours[key] = their;
             }
             result = await push();
+            localStorage.setItem("entries", JSON.stringify(ours));
         }
         catch (r) {
             result = r;
