@@ -1,6 +1,6 @@
 // import { encrypt } from './sjcl';
 
-ready(function () {
+ready(async function () {
 
   function getSafes (): string[] {
     var plain = localStorage.getItem("entries")
@@ -23,29 +23,39 @@ ready(function () {
     return
   }
 
-  function encrypt(data: string): string {
-    var key = the<HTMLInputElement>("#key").value
-    var cipher = sjcl.encrypt(key, data)
-    var json = JSON.stringify(cipher)
-    var base64 = btoa(json).match(/.{1,76}/g).join("\n")
-    return base64
+  function asciiToUint8Array(str: string) : Uint8Array {
+    var chars = [];
+    for (var i = 0; i < str.length; ++i)
+        chars.push(str.charCodeAt(i));
+    return new Uint8Array(chars);
   }
 
-  function decrypt(data: string): string {
-    var key = the<HTMLInputElement>("#key").value
-    var base64 = data.split("\n").join("")
-    var json = atob(base64)
-    var cipher = JSON.parse(json)
-    return sjcl.decrypt(key, cipher)
+  async function encrypt(data: string): Promise<string> {
+    try {
+      var iv = crypto.getRandomValues(new Uint8Array(16))
+      var alg = {name: "AES-GCM", iv: iv}
+      var key = await window.crypto.subtle.importKey("raw", asciiToUint8Array(the<HTMLInputElement>("#key").value), alg.name, false, ["encrypt"])
+      var cipher = await crypto.subtle.encrypt(alg, key, new TextEncoder().encode(data))
+      var text = fromByteArray(new Uint8Array(cipher))
+      return [fromByteArray(iv), text].join(":")
+    } catch (e) {
+      throw e.message
+    }
   }
 
-  // function dumpDB () {
-  //   var key = the<HTMLInputElement>("#key").value;
-  //   var plain = localStorage.getItem("entries")
-  //   var data = JSON.parse(plain)
-  //   var json = JSON.stringify(data, null, 2)
-  //   the<HTMLTextAreaElement>("#data").value = json
-  // }
+  async function decrypt(data: string): Promise<string> {
+    try {
+      var j = data.split(":")
+      var iv = toByteArray(j[0])
+      var alg = {name: "AES-GCM", iv: iv}
+      var key = await window.crypto.subtle.importKey("raw", asciiToUint8Array(the<HTMLInputElement>("#key").value), alg.name, false, ["decrypt"])
+      var plain = await crypto.subtle.decrypt(alg, key, toByteArray(j[1]))
+      var text = new TextDecoder().decode(plain)
+      return text
+    } catch (e) {
+      throw e.message
+    }
+  }
 
   function auth(): string {
     var usr = the<HTMLInputElement>("#username").value
@@ -53,26 +63,22 @@ ready(function () {
     return `Basic ${btoa(`${usr}:${pak}`)}`
   }
 
-  function push(): Promise<string> {
-    return new Promise((resolve, reject) => {
-      var key = the<HTMLInputElement>("#key").value
-      var gist = the<HTMLInputElement>("#gist").value
-      var data = encrypt(localStorage.getItem("entries"))
-      fetch(`https://api.github.com/gists/${gist}`, {
-        method: "PATCH",
-        headers: { "Authorization": auth() },
-        body: JSON.stringify({
-          description: "Password safe",
-          files: { safe: { content: data } }
-        })
-      }).then((r) => {
-        r.json().then((r) => {
-          if (r.message != null)
-            reject(r.message)
-          resolve("Pushed")
-        }).catch(reject)
-      }).catch(reject)
+  async function push(): Promise<void> {
+    var key = the<HTMLInputElement>("#key").value
+    var gist = the<HTMLInputElement>("#gist").value
+    var data = await encrypt(localStorage.getItem("entries"))
+    var res = await fetch(`https://api.github.com/gists/${gist}`, {
+      method: "PATCH",
+      headers: { "Authorization": auth() },
+      body: JSON.stringify({
+        description: "Password safe",
+        files: { safe: { content: data } }
+      })
     })
+    var j = await res.json()
+    if (j.message != null)
+      throw j.message
+    return
   }
 
   function pull(): Promise<string> {
@@ -80,11 +86,15 @@ ready(function () {
       var gist = the<HTMLInputElement>("#gist").value
       fetch(`https://api.github.com/gists/${gist}`, {
         headers: { "Authorization": auth() }
-      }).then(function(r){
-        r.json().then(function(r){
+      }).then((r) => {
+        r.json().then(async (r) => {
           if (r.message != null)
             reject(r.message)
-          var data = decrypt(r.files.safe.content)
+          try {
+            var data = await decrypt(r.files.safe.content)
+          } catch {
+            resolve("{}")
+          }
           resolve(JSON.stringify(JSON.parse(data), null, 2))
         }).catch(reject)
       }).catch(reject)
@@ -92,30 +102,37 @@ ready(function () {
   }
 
   on("#sync", "click", async (e) => {
-    var result
+    var received = 0
+    var sent = 0
     try {
       var theirs = JSON.parse(await pull())
       var ours = JSON.parse(localStorage.getItem("entries"))
-      theirs = theirs == null ? {} : theirs
-      if (ours == null) {
+      if (theirs == null) {
+        theirs = {}
+      } else if (ours == null) {
         localStorage.setItem("entries", JSON.stringify(theirs))
-        alert("Initial database imported")
         return
       }
       for (let key in theirs) {
         var their = theirs[key]
         var our = ours[key]
-        if (our == null)
+        if (our == null) {
           ours[key] = their
-        else if (our.date < their.date)
+          received++
+        } else if (our.date < their.date) {
           ours[key] = their
+          received++
+        } else if (our.date > their.date) {
+          sent++
+        }
       }
-      result = await push()
+      await push()
       localStorage.setItem("entries", JSON.stringify(ours))
     } catch (r) {
-      result = r
+      alert(r)
+      throw r
     }
-    alert(result)
+    alert(`Done. ${received} updates received, ${sent} updates sent.`)
   })
 
   on("#push", "click", async (e) => {
@@ -159,7 +176,5 @@ ready(function () {
     the<HTMLInputElement>("#key").value = genValidPassword(32, [hex])
     // dumpDB()
   })
-
-  // dumpDB();
 
 })

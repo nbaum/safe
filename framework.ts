@@ -1,5 +1,5 @@
 
-var pasteboard:any = null
+var pasteboard: any = null
 
 function yank (text:string) {
   if (pasteboard === null) {
