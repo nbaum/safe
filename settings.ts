@@ -1,28 +1,19 @@
+import { hash } from "./sjcl";
+
 // import { encrypt } from './sjcl';
 
 ready(async function () {
 
-  function getSafes (): string[] {
-    var plain = localStorage.getItem("entries")
-    var data: Entry[] = JSON.parse(plain)
-    var safes: string[] = []
-    data.forEach(datum => {
-      safes.push(datum.safe)
-    });
-    return safes
+  interface Params {
+    name: string
+    iv: Uint8Array
+    key: CryptoKey
+    salt: Uint8Array
+    iterations: number
+    hash: string
+    length: number
   }
-
-  function getEntries (safe: string): Entry[] {
-    // var plain = localStorage.getItem("entries")
-    // var data: Entry[] = JSON.parse(plain)
-    // var safes: string[] = []
-    // data.forEach(datum => {
-    //   safes.push(datum.safe)
-    // });
-    // return safes
-    return
-  }
-
+  
   function asciiToUint8Array(str: string) : Uint8Array {
     var chars = [];
     for (var i = 0; i < str.length; ++i)
@@ -30,14 +21,56 @@ ready(async function () {
     return new Uint8Array(chars);
   }
 
+  async function genkey(p: Params): Promise<Params> {
+    var key1 = await window.crypto.subtle.importKey("raw", asciiToUint8Array(the<HTMLInputElement>("#key").value), "PBKDF2", false, ["deriveKey"])
+    var key2 = await window.crypto.subtle.deriveKey({name: "PBKDF2", salt: p.salt, hash: p.hash, iterations: p.iterations}, key1, {name: p.name, length: p.length}, false, ["decrypt", "encrypt"])
+    p.key = key2
+    return p
+  }
+
+  async function genParams(): Promise<Params> {
+    var p = {
+      name: "AES-GCM",
+      iv: crypto.getRandomValues(new Uint8Array(16)),
+      salt: crypto.getRandomValues(new Uint8Array(16)) ,
+      iterations: 10000,
+      hash: "SHA-512",
+      length: 256,
+      key: <CryptoKey> null,
+    }
+    return await genkey(p)
+  }
+
+  function encodeParams(p: Params): any {
+    return {
+      name: p.name,
+      iv: fromByteArray(p.iv),
+      salt: fromByteArray(p.salt),
+      iterations: p.iterations,
+      hash: p.hash,
+      length: p.length,
+    }
+  }
+
+  async function decodeParams(p: any): Promise<Params> {
+    var r = {
+      name: p.name,
+      iv: toByteArray(p.iv),
+      salt: toByteArray(p.salt),
+      iterations: p.iterations,
+      hash: p.hash,
+      length: p.length,
+      key: <CryptoKey> null,
+    }
+    return await genkey(r)
+  }
+
   async function encrypt(data: string): Promise<string> {
     try {
-      var iv = crypto.getRandomValues(new Uint8Array(16))
-      var alg = {name: "AES-GCM", iv: iv}
-      var key = await window.crypto.subtle.importKey("raw", asciiToUint8Array(the<HTMLInputElement>("#key").value), alg.name, false, ["encrypt"])
-      var cipher = await crypto.subtle.encrypt(alg, key, new TextEncoder().encode(data))
+      var p = await genParams()
+      var cipher = await crypto.subtle.encrypt(p, p.key, new TextEncoder().encode(data))
       var text = fromByteArray(new Uint8Array(cipher))
-      return [fromByteArray(iv), text].join(":")
+      return JSON.stringify({alg: encodeParams(p), data: text})
     } catch (e) {
       throw e.message
     }
@@ -45,11 +78,9 @@ ready(async function () {
 
   async function decrypt(data: string): Promise<string> {
     try {
-      var j = data.split(":")
-      var iv = toByteArray(j[0])
-      var alg = {name: "AES-GCM", iv: iv}
-      var key = await window.crypto.subtle.importKey("raw", asciiToUint8Array(the<HTMLInputElement>("#key").value), alg.name, false, ["decrypt"])
-      var plain = await crypto.subtle.decrypt(alg, key, toByteArray(j[1]))
+      var j = JSON.parse(data)
+      var p = await decodeParams(j.alg)
+      var plain = await crypto.subtle.decrypt(p, p.key, toByteArray(j.data))
       var text = new TextDecoder().decode(plain)
       return text
     } catch (e) {
